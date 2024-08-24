@@ -612,6 +612,8 @@ if uploaded_file is not None:
                     prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
                     output = llama31_70b(prompt_text)
                     st.write(output)
+                else:
+                    st.write(f"The {method} method has not bee released yet. Stay Tuned!")
             else:
                 if method == 'SVM':
                     X = df[features]
@@ -965,22 +967,28 @@ if uploaded_file is not None:
                     prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
                     output = llama31_70b(prompt_text)
                     st.write(output)
+                else:
+                    st.write(f"The {method} method has not bee released yet. Stay Tuned!")
 
 
     elif analysis_mode == "Data Vizualisation":
         st.subheader("Data Vizualisation")
+        st.write(f"The {analysis_mode} analysis mode has not bee released yet. Stay Tuned!")
         
 
 
     elif analysis_mode == "Text Analysis":
         st.subheader("Text Analysis")
+        st.write(f"The {analysis_mode} analysis mode has not bee released yet. Stay Tuned!")
 
 
     elif analysis_mode == "Dimensionality Reduction":
         st.subheader("Dimensionality Reduction")
+        st.write(f"The {analysis_mode} analysis mode has not bee released yet. Stay Tuned!")
 
     elif analysis_mode == "Hypothesis Testing":
         st.subheader("Hypothesis Testing")
+        st.write(f"The {analysis_mode} analysis mode has not bee released yet. Stay Tuned!")
 
 
 
