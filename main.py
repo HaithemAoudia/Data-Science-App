@@ -3,7 +3,6 @@ import os
 import pandas as pd
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import pandas as pd
-os.chdir(r"C:\Users\haith\OneDrive\Desktop\Data Analyst Application")
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LinearRegression
 import numpy as np
