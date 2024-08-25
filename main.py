@@ -20,8 +20,6 @@ import time
 import xgboost
 client = Groq(api_key= "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")
 
-
-
 def identify_variable_types(df):
     """
     Identify continuous and discrete variables in a DataFrame.
@@ -293,13 +291,13 @@ if uploaded_file is not None:
         st.write(output)
         features = st.multiselect("Select the features to be used in developing the prediction model. If you are not sure of the best features to be selected select 'auto' to be automatically select the best features.", ["Auto"] + df_columns)
         method = st.selectbox("Select which machine learning methods you would like to use build the prediction model", ["SVM", "XGBoost", "Gradient Boosting", "Random Forest", "KNN", "Nueral Network"])
-        start_training = st.button("Start Training!")
-        if start_training == True:
-            if task == 'Classification':
-                if method == 'SVM':
-                    X = df[features]
-                    y = df[prediction_variable]
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        if task == 'Classification':
+            if method == 'SVM':
+                X = df[features]
+                y = df[prediction_variable]
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                start_training = st.button("Start Training!")
+                if start_training == True:
                     classifier = SVC()
                     classifier.fit(X_train, y_train)
                     y_pred = classifier.predict(X_test)
@@ -325,95 +323,146 @@ if uploaded_file is not None:
                     output = llama31_70b(prompt_text)
                     st.write(output)
 
-                elif method == 'XGBoost':
-                    training_method = st.selectbox("Select if you want to train the XGBoost model using the default parameter or utilize hyperparamete tuning to optimize the model", ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"], help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period")
-                    if training_method == "Default Parameters":
+            elif method == 'XGBoost':
+                training_method = st.selectbox("Select if you want to train the XGBoost model using the default parameter or utilize hyperparamete tuning to optimize the model", ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"], help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period")
+    
+                if training_method == "Default Parameters":
+                    start_training = st.button("Start Training!")
+                    if start_training == True:
                         X = df[features]
                         y = df[prediction_variable]
-
                         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
                         model = xgboost.XGBClassifier()
                         model.fit(X_train, y_train)
+                        y_pred = model.predict(X_test)
+                        accuracy = accuracy_score(y_test, y_pred)
+                        cm = confusion_matrix(y_test, y_pred)
+                        plt.figure(figsize=(1,0.5))
+                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', annot_kws={"size": 5}, cbar=False)
+                        plt.xlabel('Predicted Labels', fontdict= {'fontsize': 4})
+                        plt.ylabel('True Labels', {'fontsize': 4})
+                        plt.xticks(fontsize=4)
+                        plt.yticks(fontsize=4)
+                        plt.title('Confusion Matrix Heatmap', fontdict= {'fontsize': 4})
+                        report = classification_report(y_test, y_pred, output_dict=True)
+                        report_df = pd.DataFrame(report).transpose()
+                        styled_report = report_df.style.background_gradient(cmap='viridis').format(precision=2)
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.pyplot(plt)
+                        with col2:
+                            st.write(styled_report)
+                        template = "You will interpret the results from the XGBoost model highlighting only the key findings:"
+                        prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
+                        output = llama31_70b(prompt_text)
+                        st.write(output)
                         
-                    else:
-                        st.write("""
-                            The following parameters can be tuned for hyperparameter optimization in the XGBoost algorithm:
+                else:
+                    st.write("""
+                        The following parameters can be tuned for hyperparameter optimization in the XGBoost algorithm:
 
-                            1. **Learning Rate:** Controls the step size at each iteration while moving toward a minimum of the loss function. A smaller learning rate requires more iterations but can lead to better model performance.
+                        1. **Learning Rate:** Controls the step size at each iteration while moving toward a minimum of the loss function. A smaller learning rate requires more iterations but can lead to better model performance.
 
-                            2. **Maximum Depth:** Determines the maximum depth of a tree. Increasing depth allows the model to capture more complex patterns but may lead to overfitting if set too high.
+                        2. **Maximum Depth:** Determines the maximum depth of a tree. Increasing depth allows the model to capture more complex patterns but may lead to overfitting if set too high.
 
-                            3. **Number of Estimators:** Specifies the number of trees to be built in the model. A higher number of estimators can improve model accuracy but may increase computation time and risk overfitting.
+                        3. **Number of Estimators:** Specifies the number of trees to be built in the model. A higher number of estimators can improve model accuracy but may increase computation time and risk overfitting.
 
-                            4. **Subsample:** Represents the fraction of samples to be used for each tree. Setting a value less than 1.0 introduces randomness, which helps prevent overfitting by ensuring that not all data points are used in each iteration.
-                            """)
-                        approach = st.selectbox("Select if you to manually choose the parameters or automcatically select the best hyperparamters", ["Manual", "Auto"])
-                        parameters = st.multiselect("Select the parameters to be tuned", ["Learning Rate", "Maximum Depth", "Number of Estimators", "Subsample"])
-                        if approach == "Manual":
-                            param_grid = {}
-                            if "Learning Rate" in parameters:
-                                param_grid['learning_rate'] = st.slider("Learning Rate", 0.01, 0.5, 0.1, 0.01)
-                            else:
-                                param_grid['learning_rate'] = 0.1
-                            if "Maximum Depth" in parameters:
-                                param_grid['max_depth'] = st.slider("Maximum Depth", 1, 10, 3, 1)
-                            else:
-                                param_grid['max_depth'] = 6
-                            if "Number of Estimators" in parameters:
-                                param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 500, 100, 50)
-                            else:
-                                param_grid['n_estimators'] = 100
-                            if "Subsample" in parameters:
-                                param_grid['subsample'] = st.slider("Subsample", 0.5, 1.0, 0.8, 0.1)
-                            else:
-                                param_grid['subsample'] = 0.5
+                        4. **Subsample:** Represents the fraction of samples to be used for each tree. Setting a value less than 1.0 introduces randomness, which helps prevent overfitting by ensuring that not all data points are used in each iteration.
+                        """)
+                    approach = st.selectbox("Select if you to manually choose the parameters or automcatically select the best hyperparamters", ["Manual", "Auto"])
+                    parameters = st.multiselect("Select the parameters to be tuned", ["Learning Rate", "Maximum Depth", "Number of Estimators", "Subsample"])
+                    if approach == "Manual":
+                        param_grid = {}
+                        if "Learning Rate" in parameters:
+                            param_grid['learning_rate'] = st.slider("Learning Rate", 0.01, 0.5, 0.1, 0.01)
+                        else:
+                            param_grid['learning_rate'] = 0.1
+                        if "Maximum Depth" in parameters:
+                            param_grid['max_depth'] = st.slider("Maximum Depth", 1, 10, 3, 1)
+                        else:
+                            param_grid['max_depth'] = 6
+                        if "Number of Estimators" in parameters:
+                            param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 500, 100, 50)
+                        else:
+                            param_grid['n_estimators'] = 100
+                        if "Subsample" in parameters:
+                            param_grid['subsample'] = st.slider("Subsample", 0.5, 1.0, 0.8, 0.1)
+                        else:
+                            param_grid['subsample'] = 0.5
 
+                        start_training = st.button("Start Training!")
+                        if start_training == True:  
                             X = df[features]
                             y = df[prediction_variable]
                             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
                             model = xgboost.XGBClassifier(learning_rate=param_grid['learning_rate'], 
-                                    max_depth= param_grid['max_depth'], 
-                                    n_estimators=param_grid['n_estimators'], 
-                                    subsample=param_grid['subsample'])  
+                                max_depth= param_grid['max_depth'], 
+                                n_estimators=param_grid['n_estimators'], 
+                                subsample=param_grid['subsample'])
                             model.fit(X_train, y_train)
-                        else:
-                            param_grid = {}
-                            if "Learning Rate" in parameters:
-                            # Use multiselect for selecting multiple learning rates
-                                selected_learning_rates = st.multiselect("Select Learning Rates", [0.01, 0.02, 0.05, 0.1, 0.2])
-                                if selected_learning_rates:
-                                    param_grid['learning_rate'] = selected_learning_rates
+                            y_pred = model.predict(X_test)
+                            accuracy = accuracy_score(y_test, y_pred)
+                            cm = confusion_matrix(y_test, y_pred)
+                            plt.figure(figsize=(1,0.5))
+                            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', annot_kws={"size": 5}, cbar=False)
+                            plt.xlabel('Predicted Labels', fontdict= {'fontsize': 4})
+                            plt.ylabel('True Labels', {'fontsize': 4})
+                            plt.xticks(fontsize=4)
+                            plt.yticks(fontsize=4)
+                            plt.title('Confusion Matrix Heatmap', fontdict= {'fontsize': 4})
+                            report = classification_report(y_test, y_pred, output_dict=True)
+                            report_df = pd.DataFrame(report).transpose()
+                            styled_report = report_df.style.background_gradient(cmap='viridis').format(precision=2)
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.pyplot(plt)
+                            with col2:
+                                st.write(styled_report)
+                            template = "You will interpret the results from the XGBoost model highlighting only the key findings:"
+                            prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
+                            output = llama31_70b(prompt_text)
+                            st.write(output)
 
-                            if "Maximum Depth" in parameters:
-                            # Use multiselect for selecting multiple maximum depth values
-                                selected_max_depths = st.multiselect("Select Maximum Depths", [2, 3, 4, 5, 6])
-                                if selected_max_depths:
-                                    param_grid['max_depth'] = selected_max_depths
+                    else:
+                        param_grid = {}
+                        if "Learning Rate" in parameters:
+                        # Use multiselect for selecting multiple learning rates
+                            selected_learning_rates = st.multiselect("Select Learning Rates", [0.01, 0.02, 0.05, 0.1, 0.2])
+                            if selected_learning_rates:
+                                param_grid['learning_rate'] = selected_learning_rates
 
-                            if "Number of Estimators" in parameters:
-                                # Use multiselect for selecting multiple numbers of estimators
-                                selected_estimators = st.multiselect("Select Number of Estimators", [10, 100, 1000, 2000, 4000])
-                                if selected_estimators:
-                                    param_grid['n_estimators'] = selected_estimators
+                        if "Maximum Depth" in parameters:
+                        # Use multiselect for selecting multiple maximum depth values
+                            selected_max_depths = st.multiselect("Select Maximum Depths", [2, 3, 4, 5, 6])
+                            if selected_max_depths:
+                                param_grid['max_depth'] = selected_max_depths
 
-                            if "Subsample" in parameters:
-                                # Use multiselect for selecting multiple subsample values
-                                selected_subsamples = st.multiselect("Select Subsample Values", [0.01, 0.1, 0.5, 0.8])
-                                if selected_subsamples:
-                                    param_grid['subsample'] = selected_subsamples
+                        if "Number of Estimators" in parameters:
+                            # Use multiselect for selecting multiple numbers of estimators
+                            selected_estimators = st.multiselect("Select Number of Estimators", [10, 100, 1000, 2000, 4000])
+                            if selected_estimators:
+                                param_grid['n_estimators'] = selected_estimators
+
+                        if "Subsample" in parameters:
+                            # Use multiselect for selecting multiple subsample values
+                            selected_subsamples = st.multiselect("Select Subsample Values", [0.01, 0.1, 0.5, 0.8])
+                            if selected_subsamples:
+                                param_grid['subsample'] = selected_subsamples
+                        start_training = st.button("Start Training!")
+                        if start_training == True:
                             X = df[features]
                             y = df[prediction_variable]
                             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
                             model = GridSearchCV(estimator=xgboost.XGBClassifier( subsample=0.5, 
-                                        colsample_bytree=0.5, 
-                                        eval_metric='auc',
-                                        use_label_encoder = False), 
-                                        param_grid=param_grid, 
-                                        cv=5, 
-                                        scoring= ['accuracy', 'roc_auc'],
-                                        refit='accuracy')
-
+                                    colsample_bytree=0.5, 
+                                    eval_metric='auc',
+                                    use_label_encoder = False), 
+                                    param_grid=param_grid, 
+                                    cv=5, 
+                                    scoring= ['accuracy', 'roc_auc'],
+                                    refit='accuracy')
                             model.fit(X_train, y_train)
+                            
                             optimal_params = model.best_params_
 
                             if "Subsample" in parameters:
@@ -431,142 +480,171 @@ if uploaded_file is not None:
                             if "Maximum Depth" in parameters:
                                 optimal_learning_maxdepth = optimal_params.get("max_depth", "Not Selected")
                                 st.write("**Optimal Maximum Depth:**", optimal_learning_maxdepth)
-                    y_pred = model.predict(X_test)
-                    accuracy = accuracy_score(y_test, y_pred)
-                    cm = confusion_matrix(y_test, y_pred)
-                    plt.figure(figsize=(1,0.5))
-                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', annot_kws={"size": 5}, cbar=False)
-                    plt.xlabel('Predicted Labels', fontdict= {'fontsize': 4})
-                    plt.ylabel('True Labels', {'fontsize': 4})
-                    plt.xticks(fontsize=4)
-                    plt.yticks(fontsize=4)
-                    plt.title('Confusion Matrix Heatmap', fontdict= {'fontsize': 4})
-                    report = classification_report(y_test, y_pred, output_dict=True)
-                    report_df = pd.DataFrame(report).transpose()
-                    styled_report = report_df.style.background_gradient(cmap='viridis').format(precision=2)
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.pyplot(plt)
-                    with col2:
-                        st.write(styled_report)
-                    template = "You will interpret the results from the XGBoost model highlighting only the key findings:"
-                    prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
-                    output = llama31_70b(prompt_text)
-                    st.write(output)
+                            y_pred = model.predict(X_test)
+                            accuracy = accuracy_score(y_test, y_pred)
+                            cm = confusion_matrix(y_test, y_pred)
+                            plt.figure(figsize=(1,0.5))
+                            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', annot_kws={"size": 5}, cbar=False)
+                            plt.xlabel('Predicted Labels', fontdict= {'fontsize': 4})
+                            plt.ylabel('True Labels', {'fontsize': 4})
+                            plt.xticks(fontsize=4)
+                            plt.yticks(fontsize=4)
+                            plt.title('Confusion Matrix Heatmap', fontdict= {'fontsize': 4})
+                            report = classification_report(y_test, y_pred, output_dict=True)
+                            report_df = pd.DataFrame(report).transpose()
+                            styled_report = report_df.style.background_gradient(cmap='viridis').format(precision=2)
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.pyplot(plt)
+                            with col2:
+                                st.write(styled_report)
+                            template = "You will interpret the results from the XGBoost model highlighting only the key findings:"
+                            prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
+                            output = llama31_70b(prompt_text)
+                            st.write(output)
 
-                elif method == 'Random Forest':
-                    training_method = st.selectbox("Select if you want to train the XGBoost model using the default parameter or utilize hyperparamete tuning to optimize the model", ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"], help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period")
-                    if training_method == "Default Parameters":
+            elif method == 'Random Forest':
+                training_method = st.selectbox("Select if you want to train the XGBoost model using the default parameter or utilize hyperparamete tuning to optimize the model", ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"], help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period")
+                if training_method == "Default Parameters":
+                    X = df[features]
+                    y = df[prediction_variable]
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                    
+                    start_training = st.button("Start Training!")
+                    if start_training == True:
+                        model = RandomForestClassifier()
+                        model.fit(X_train, y_train)
+                        y_pred = model.predict(X_test)
+                        accuracy = accuracy_score(y_test, y_pred)
+                        cm = confusion_matrix(y_test, y_pred)
+                        plt.figure(figsize=(1,0.5))
+                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', annot_kws={"size": 5}, cbar=False)
+                        plt.xlabel('Predicted Labels', fontdict= {'fontsize': 4})
+                        plt.ylabel('True Labels', {'fontsize': 4})
+                        plt.xticks(fontsize=4)
+                        plt.yticks(fontsize=4)
+                        plt.title('Confusion Matrix Heatmap', fontdict= {'fontsize': 4})
+                        report = classification_report(y_test, y_pred, output_dict=True)
+                        report_df = pd.DataFrame(report).transpose()
+                        styled_report = report_df.style.background_gradient(cmap='viridis').format(precision=2)
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.pyplot(plt)
+                        with col2:
+                            st.write(styled_report)
+                        template = "You will interpret the results from the Random Forest model highlighting only the key findings:"
+                        prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
+                        output = llama31_70b(prompt_text)
+                        st.write(output)
+
+                else:
+                    st.write("""
+                        The following parameters can be tuned for hyperparameter optimization in the Random Forest algorithm:
+
+                        1. **Maximum Depth:** Determines the maximum depth of each tree in the forest. A deeper tree can capture more complex patterns in the data but may lead to overfitting if the depth is too high. Setting a limit on the depth of the trees helps control the model complexity and prevents overfitting.
+
+                        2. **Number of Estimators:** Specifies the number of trees to be built in the model (i.e., the size of the forest). A higher number of estimators can lead to better model performance by reducing variance and improving accuracy. However, this also increases computation time, so a balance must be struck between accuracy and computational efficiency.
+
+                        3. **Minimum Samples Split:** The minimum number of samples required to split an internal node. This parameter controls how deep the tree grows by ensuring that a node is split only if it contains at least the specified number of samples. Higher values prevent the model from learning overly specific patterns, thus reducing the risk of overfitting.
+
+                        4. **Minimum Samples Leaf:** The minimum number of samples required to be at a leaf node. This parameter helps prevent the model from creating nodes that contain very few data points, which can lead to overfitting. Setting this value higher forces the algorithm to generalize more by considering a larger number of samples at each leaf.
+
+                        5. **Maximum Features:** The maximum number of features considered for splitting a node. By limiting the number of features, this parameter introduces randomness into the model, making it more robust to overfitting and increasing the model's ability to generalize. The `sqrt` of the total number of features is often used as a default value for classification tasks, while `log2` is another common choice.
+
+                        """)
+                    approach = st.selectbox("Select if you to manually choose the parameters or automcatically select the best hyperparamters", ["Manual", "Auto"])
+                    parameters = st.multiselect("Select the parameters to be tuned", ["Maximum Depth", "Number of Estimators", "Minimum Sample Split", "Minimum Samples Leaf", "Maximum Features"])
+                    if approach == "Manual":
+                        param_grid = {}
+                        if "Maximum Depth" in parameters:
+                            param_grid['max_depth'] = st.slider("Maximum Depth", 1, 20, 10)  # Changed to correct order (min, max, default)
+                        else:
+                            param_grid['max_depth'] = None
+
+                        if "Maximum Features" in parameters:
+                            param_grid['max_features'] = st.selectbox("Maximum Features", ['sqrt', 'log2', 'None'])
+                        else:
+                            param_grid['max_features'] = 'sqrt'  # Corrected key
+
+                        if "Number of Estimators" in parameters:
+                            param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 1000, 100)  # Changed to correct order (min, max, default)
+                        else:
+                            param_grid['n_estimators'] = 100
+
+                        if "Minimum Samples Leaf" in parameters:
+                            param_grid['min_samples_leaf'] = st.slider("Minimum Samples Leaf", 1, 5, 1)  # Using integers instead
+                        else:
+                            param_grid['min_samples_leaf'] = 1
+
+                        if "Minimum Sample Split" in parameters:
+                            param_grid['min_samples_split'] = st.slider("Minimum Sample Split", 2, 5, 2)  # Corrected the typo and range
+                        else:
+                            param_grid['min_samples_split'] = 2
+
                         X = df[features]
                         y = df[prediction_variable]
                         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                        model = RandomForestClassifier()
-                        model.fit(X_train, y_train)
 
-                    else:
-                        st.write("""
-                            The following parameters can be tuned for hyperparameter optimization in the Random Forest algorithm:
-
-                            1. **Maximum Depth:** Determines the maximum depth of each tree in the forest. A deeper tree can capture more complex patterns in the data but may lead to overfitting if the depth is too high. Setting a limit on the depth of the trees helps control the model complexity and prevents overfitting.
-
-                            2. **Number of Estimators:** Specifies the number of trees to be built in the model (i.e., the size of the forest). A higher number of estimators can lead to better model performance by reducing variance and improving accuracy. However, this also increases computation time, so a balance must be struck between accuracy and computational efficiency.
-
-                            3. **Minimum Samples Split:** The minimum number of samples required to split an internal node. This parameter controls how deep the tree grows by ensuring that a node is split only if it contains at least the specified number of samples. Higher values prevent the model from learning overly specific patterns, thus reducing the risk of overfitting.
-
-                            4. **Minimum Samples Leaf:** The minimum number of samples required to be at a leaf node. This parameter helps prevent the model from creating nodes that contain very few data points, which can lead to overfitting. Setting this value higher forces the algorithm to generalize more by considering a larger number of samples at each leaf.
-
-                            5. **Maximum Features:** The maximum number of features considered for splitting a node. By limiting the number of features, this parameter introduces randomness into the model, making it more robust to overfitting and increasing the model's ability to generalize. The `sqrt` of the total number of features is often used as a default value for classification tasks, while `log2` is another common choice.
-
-                            """)
-                        approach = st.selectbox("Select if you to manually choose the parameters or automcatically select the best hyperparamters", ["Manual", "Auto"])
-                        parameters = st.multiselect("Select the parameters to be tuned", ["Maximum Depth", "Number of Estimators", "Minimum Sample Split", "Minimum Samples Leaf", "Maximum Features"])
-                        if approach == "Manual":
-                            param_grid = {}
-                            if "Maximum Depth" in parameters:
-                                param_grid['max_depth'] = st.slider("Maximum Depth", 1, 20, 10)  # Changed to correct order (min, max, default)
-                            else:
-                                param_grid['max_depth'] = None
-
-                            if "Maximum Features" in parameters:
-                                param_grid['max_features'] = st.selectbox("Maximum Features", ['sqrt', 'log2', 'None'])
-                            else:
-                                param_grid['max_features'] = 'sqrt'  # Corrected key
-
-                            if "Number of Estimators" in parameters:
-                                param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 1000, 100)  # Changed to correct order (min, max, default)
-                            else:
-                                param_grid['n_estimators'] = 100
-
-                            if "Minimum Samples Leaf" in parameters:
-                                param_grid['min_samples_leaf'] = st.slider("Minimum Samples Leaf", 1, 5, 1)  # Using integers instead
-                            else:
-                                param_grid['min_samples_leaf'] = 1
-
-                            if "Minimum Sample Split" in parameters:
-                                param_grid['min_samples_split'] = st.slider("Minimum Sample Split", 2, 5, 2)  # Corrected the typo and range
-                            else:
-                                param_grid['min_samples_split'] = 2
-
-                            st.write(param_grid)
-
-                            X = df[features]
-                            y = df[prediction_variable]
-                            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
+                        
+                        start_training = st.button("Start Training!")
+                        if start_training == True:
                             model = RandomForestClassifier(max_depth= param_grid['max_depth'], 
-                                                        max_features= param_grid['max_features'],  
-                                                        min_samples_leaf= param_grid['min_samples_leaf'], 
-                                                        min_samples_split=param_grid['min_samples_split'], 
-                                                        n_estimators=param_grid['n_estimators'])
+                                                    max_features= param_grid['max_features'],  
+                                                    min_samples_leaf= param_grid['min_samples_leaf'], 
+                                                    min_samples_split=param_grid['min_samples_split'], 
+                                                    n_estimators=param_grid['n_estimators'])
                             model.fit(X_train, y_train)
+                    else:
+                        X = df[features]
+                        y = df[prediction_variable]
+                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                        param_grid = {}
+                        if "Maximum Depth" in parameters:
+                            # Use multiselect for selecting multiple maximum depth values
+                            selected_max_depths = st.multiselect("Select Maximum Depths", [1, 2, 3, 4, 5, 10, 15, 20])
+                            if selected_max_depths:
+                                param_grid['max_depth'] = selected_max_depths
                         else:
-                            X = df[features]
-                            y = df[prediction_variable]
-                            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                            param_grid = {}
-                            if "Maximum Depth" in parameters:
-                                # Use multiselect for selecting multiple maximum depth values
-                                selected_max_depths = st.multiselect("Select Maximum Depths", [1, 2, 3, 4, 5, 10, 15, 20])
-                                if selected_max_depths:
-                                    param_grid['max_depth'] = selected_max_depths
-                            else:
-                                param_grid['max_depth'] = [None]  # Default to None if not specified
+                            param_grid['max_depth'] = [None]  # Default to None if not specified
 
-                            if "Maximum Features" in parameters:
-                                # Use multiselect for selecting multiple maximum features values
-                                selected_max_features = st.multiselect("Select Maximum Features", ['sqrt', 'log2', None])
-                                if selected_max_features:
-                                    param_grid['max_features'] = selected_max_features
-                            else:
-                                param_grid['max_features'] = ['sqrt']  # Default to 'sqrt' if not specified
+                        if "Maximum Features" in parameters:
+                            # Use multiselect for selecting multiple maximum features values
+                            selected_max_features = st.multiselect("Select Maximum Features", ['sqrt', 'log2', None])
+                            if selected_max_features:
+                                param_grid['max_features'] = selected_max_features
+                        else:
+                            param_grid['max_features'] = ['sqrt']  # Default to 'sqrt' if not specified
 
-                            if "Number of Estimators" in parameters:
-                                # Use multiselect for selecting multiple numbers of estimators
-                                selected_estimators = st.multiselect("Select Number of Estimators", [50, 100, 200, 500, 1000])
-                                if selected_estimators:
-                                    param_grid['n_estimators'] = selected_estimators
-                            else:
-                                param_grid['n_estimators'] = [100]  # Default to 100 if not specified
+                        if "Number of Estimators" in parameters:
+                            # Use multiselect for selecting multiple numbers of estimators
+                            selected_estimators = st.multiselect("Select Number of Estimators", [50, 100, 200, 500, 1000])
+                            if selected_estimators:
+                                param_grid['n_estimators'] = selected_estimators
+                        else:
+                            param_grid['n_estimators'] = [100]  # Default to 100 if not specified
 
-                            if "Minimum Samples Leaf" in parameters:
-                                # Use multiselect for selecting multiple minimum samples leaf values
-                                selected_min_samples_leaf = st.multiselect("Select Minimum Samples Leaf", [1, 2, 3, 4, 5])
-                                if selected_min_samples_leaf:
-                                    param_grid['min_samples_leaf'] = selected_min_samples_leaf
-                            else:
-                                param_grid['min_samples_leaf'] = [1]  # Default to 1 if not specified
+                        if "Minimum Samples Leaf" in parameters:
+                            # Use multiselect for selecting multiple minimum samples leaf values
+                            selected_min_samples_leaf = st.multiselect("Select Minimum Samples Leaf", [1, 2, 3, 4, 5])
+                            if selected_min_samples_leaf:
+                                param_grid['min_samples_leaf'] = selected_min_samples_leaf
+                        else:
+                            param_grid['min_samples_leaf'] = [1]  # Default to 1 if not specified
 
-                            if "Minimum Sample Split" in parameters:
-                                # Use multiselect for selecting multiple minimum sample split values
-                                selected_min_samples_split = st.multiselect("Select Minimum Sample Split", [2, 3, 4, 5])
-                                if selected_min_samples_split:
-                                    param_grid['min_samples_split'] = selected_min_samples_split
-                            else:
-                                param_grid['min_samples_split'] = [2]  # Default to 2 if not specified
+                        if "Minimum Sample Split" in parameters:
+                            # Use multiselect for selecting multiple minimum sample split values
+                            selected_min_samples_split = st.multiselect("Select Minimum Sample Split", [2, 3, 4, 5])
+                            if selected_min_samples_split:
+                                param_grid['min_samples_split'] = selected_min_samples_split
+                        else:
+                            param_grid['min_samples_split'] = [2]  # Default to 2 if not specified
+                        
+                        # Assuming model.best_params_ is already defined and contains the optimal parameters
+                        start_training = st.button("Start Training!")
+                        if start_training == True:
                             model = GridSearchCV(estimator=RandomForestClassifier(), param_grid=param_grid, cv=5, 
-                                                scoring= ['accuracy', 'roc_auc'],
-                                                refit='accuracy')
-                            # Assuming model.best_params_ is already defined and contains the optimal parameters
+                                            scoring= ['accuracy', 'roc_auc'],
+                                            refit='accuracy')
                             model.fit(X_train, y_train)
                             optimal_params = model.best_params_
 
@@ -590,42 +668,45 @@ if uploaded_file is not None:
                                 optimal_min_samples_split = optimal_params.get("min_samples_split", "Not Selected")
                                 st.write("**Optimal Minimum Sample Split:**", optimal_min_samples_split)
                                 
-                    y_pred = model.predict(X_test)
-                    accuracy = accuracy_score(y_test, y_pred)
-                    cm = confusion_matrix(y_test, y_pred)
-                    plt.figure(figsize=(1,0.5))
-                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', annot_kws={"size": 5}, cbar=False)
-                    plt.xlabel('Predicted Labels', fontdict= {'fontsize': 4})
-                    plt.ylabel('True Labels', {'fontsize': 4})
-                    plt.xticks(fontsize=4)
-                    plt.yticks(fontsize=4)
-                    plt.title('Confusion Matrix Heatmap', fontdict= {'fontsize': 4})
-                    report = classification_report(y_test, y_pred, output_dict=True)
-                    report_df = pd.DataFrame(report).transpose()
-                    styled_report = report_df.style.background_gradient(cmap='viridis').format(precision=2)
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.pyplot(plt)
-                    with col2:
-                        st.write(styled_report)
-                    template = "You will interpret the results from the Random Forest model highlighting only the key findings:"
-                    prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
-                    output = llama31_70b(prompt_text)
-                    st.write(output)
-                else:
-                    st.write(f"The {method} method has not bee released yet. Stay Tuned!")
+                            y_pred = model.predict(X_test)
+                            accuracy = accuracy_score(y_test, y_pred)
+                            cm = confusion_matrix(y_test, y_pred)
+                            plt.figure(figsize=(1,0.5))
+                            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', annot_kws={"size": 5}, cbar=False)
+                            plt.xlabel('Predicted Labels', fontdict= {'fontsize': 4})
+                            plt.ylabel('True Labels', {'fontsize': 4})
+                            plt.xticks(fontsize=4)
+                            plt.yticks(fontsize=4)
+                            plt.title('Confusion Matrix Heatmap', fontdict= {'fontsize': 4})
+                            report = classification_report(y_test, y_pred, output_dict=True)
+                            report_df = pd.DataFrame(report).transpose()
+                            styled_report = report_df.style.background_gradient(cmap='viridis').format(precision=2)
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.pyplot(plt)
+                            with col2:
+                                st.write(styled_report)
+                            template = "You will interpret the results from the Random Forest model highlighting only the key findings:"
+                            prompt_text = template +  "'''" + str(accuracy) + "'''" + str(report)
+                            output = llama31_70b(prompt_text)
+                            st.write(output)
             else:
-                if method == 'SVM':
-                    X = df[features]
-                    y = df[prediction_variable]
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                st.write(f"The {method} method has not bee released yet. Stay Tuned!")
+        else:
+            if method == 'SVM':
+                X = df[features]
+                y = df[prediction_variable]
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-                    # Use SVR for regression
+                # Use SVR for regression
+                
+                start_training = st.button("Start Training!")
+                if start_training == True:
                     regressor = SVR()
                     regressor.fit(X_train, y_train)
                     y_pred = regressor.predict(X_test)
 
-                    # Evaluate regression performance
+                # Evaluate regression performance
                     mse = mean_squared_error(y_test, y_pred)
                     mae = mean_absolute_error(y_test, y_pred)
                     r2 = r2_score(y_test, y_pred)
@@ -652,62 +733,93 @@ if uploaded_file is not None:
                     prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
                     output = llama31_70b(prompt_text)
                     st.write(output)  
-                elif method == 'XGBoost':
-                    training_method = st.selectbox(
-                    "Select if you want to train the XGBoost model using the default parameter or utilize hyperparameter tuning to optimize the model",
-                    ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"],
-                    help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period"
-                )
+            elif method == 'XGBoost':
+                training_method = st.selectbox(
+                "Select if you want to train the XGBoost model using the default parameter or utilize hyperparameter tuning to optimize the model",
+                ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"],
+                help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period"
+            )
 
-                    if training_method == "Default Parameters":
-                        X = df[features]
-                        y = df[prediction_variable]
+                if training_method == "Default Parameters":
+                    X = df[features]
+                    y = df[prediction_variable]
 
-                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                    
+                    start_training = st.button("Start Training!")
+                    if start_training == True:
                         model = xgboost.XGBRegressor()
                         model.fit(X_train, y_train)
-                        
-                    else:
-                        st.write("""
-                            The following parameters can be tuned for hyperparameter optimization in the XGBoost algorithm:
+                        y_pred = model.predict(X_test)
+                        mse = mean_squared_error(y_test, y_pred)
+                        mae = mean_absolute_error(y_test, y_pred)
+                        r2 = r2_score(y_test, y_pred)
 
-                            1. **Learning Rate:** Controls the step size at each iteration while moving toward a minimum of the loss function. A smaller learning rate requires more iterations but can lead to better model performance.
+                        # Visualizing predicted vs actual values
+                        plt.figure(figsize=(5, 5))
+                        sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
+                        plt.xlabel('Actual Values')
+                        plt.ylabel('Predicted Values')
+                        plt.title('Actual vs Predicted Values')
+                        plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
 
-                            2. **Maximum Depth:** Determines the maximum depth of a tree. Increasing depth allows the model to capture more complex patterns but may lead to overfitting if set too high.
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.pyplot(plt)
+                        with col2:
+                            st.write(f"Mean Squared Error (MSE): {mse:.2f}")
+                            st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
+                            st.write(f"R-squared (R2): {r2:.2f}")
 
-                            3. **Number of Estimators:** Specifies the number of trees to be built in the model. A higher number of estimators can improve model accuracy but may increase computation time and risk overfitting.
+                        template = "You will interpret the results from the XGBoost regression model highlighting only the key findings:"
+                        prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
+                        output = llama31_70b(prompt_text)
+                        st.write(output) 
+                    
+                else:
+                    st.write("""
+                        The following parameters can be tuned for hyperparameter optimization in the XGBoost algorithm:
 
-                            4. **Subsample:** Represents the fraction of samples to be used for each tree. Setting a value less than 1.0 introduces randomness, which helps prevent overfitting by ensuring that not all data points are used in each iteration.
-                        """)
-                        
-                        approach = st.selectbox(
-                            "Select if you want to manually choose the parameters or automatically select the best hyperparameters",
-                            ["Manual", "Auto"]
-                        )
-                        
-                        parameters = st.multiselect(
-                            "Select the parameters to be tuned",
-                            ["Learning Rate", "Maximum Depth", "Number of Estimators", "Subsample"]
-                        )
-                        
-                        if approach == "Manual":
-                            param_grid = {}
-                            if "Learning Rate" in parameters:
-                                param_grid['learning_rate'] = st.slider("Learning Rate", 0.01, 0.5, 0.1, 0.01)
-                            else:
-                                param_grid['learning_rate'] = 0.1
-                            if "Maximum Depth" in parameters:
-                                param_grid['max_depth'] = st.slider("Maximum Depth", 1, 10, 3, 1)
-                            else:
-                                param_grid['max_depth'] = 6
-                            if "Number of Estimators" in parameters:
-                                param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 500, 100, 50)
-                            else:
-                                param_grid['n_estimators'] = 100
-                            if "Subsample" in parameters:
-                                param_grid['subsample'] = st.slider("Subsample", 0.5, 1.0, 0.8, 0.1)
-                            else:
-                                param_grid['subsample'] = 0.5
+                        1. **Learning Rate:** Controls the step size at each iteration while moving toward a minimum of the loss function. A smaller learning rate requires more iterations but can lead to better model performance.
+
+                        2. **Maximum Depth:** Determines the maximum depth of a tree. Increasing depth allows the model to capture more complex patterns but may lead to overfitting if set too high.
+
+                        3. **Number of Estimators:** Specifies the number of trees to be built in the model. A higher number of estimators can improve model accuracy but may increase computation time and risk overfitting.
+
+                        4. **Subsample:** Represents the fraction of samples to be used for each tree. Setting a value less than 1.0 introduces randomness, which helps prevent overfitting by ensuring that not all data points are used in each iteration.
+                    """)
+                    
+                    approach = st.selectbox(
+                        "Select if you want to manually choose the parameters or automatically select the best hyperparameters",
+                        ["Manual", "Auto"]
+                    )
+                    
+                    parameters = st.multiselect(
+                        "Select the parameters to be tuned",
+                        ["Learning Rate", "Maximum Depth", "Number of Estimators", "Subsample"]
+                    )
+                    
+                    if approach == "Manual":
+                        param_grid = {}
+                        if "Learning Rate" in parameters:
+                            param_grid['learning_rate'] = st.slider("Learning Rate", 0.01, 0.5, 0.1, 0.01)
+                        else:
+                            param_grid['learning_rate'] = 0.1
+                        if "Maximum Depth" in parameters:
+                            param_grid['max_depth'] = st.slider("Maximum Depth", 1, 10, 3, 1)
+                        else:
+                            param_grid['max_depth'] = 6
+                        if "Number of Estimators" in parameters:
+                            param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 500, 100, 50)
+                        else:
+                            param_grid['n_estimators'] = 100
+                        if "Subsample" in parameters:
+                            param_grid['subsample'] = st.slider("Subsample", 0.5, 1.0, 0.8, 0.1)
+                        else:
+                            param_grid['subsample'] = 0.5
+
+                        start_training = st.button("Start Training!")
+                        if start_training == True:
 
                             X = df[features]
                             y = df[prediction_variable]
@@ -719,38 +831,66 @@ if uploaded_file is not None:
                                 subsample=param_grid['subsample']
                             )
                             model.fit(X_train, y_train)
-                        else:
-                            param_grid = {}
-                            if "Learning Rate" in parameters:
-                                selected_learning_rates = st.multiselect("Select Learning Rates", [0.01, 0.02, 0.05, 0.1, 0.2])
-                                if selected_learning_rates:
-                                    param_grid['learning_rate'] = selected_learning_rates
+                            y_pred = model.predict(X_test)
 
-                            if "Maximum Depth" in parameters:
-                                selected_max_depths = st.multiselect("Select Maximum Depths", [2, 3, 4, 5, 6])
-                                if selected_max_depths:
-                                    param_grid['max_depth'] = selected_max_depths
+                            mse = mean_squared_error(y_test, y_pred)
+                            mae = mean_absolute_error(y_test, y_pred)
+                            r2 = r2_score(y_test, y_pred)
 
-                            if "Number of Estimators" in parameters:
-                                selected_estimators = st.multiselect("Select Number of Estimators", [10, 100, 1000, 2000, 4000])
-                                if selected_estimators:
-                                    param_grid['n_estimators'] = selected_estimators
+                            # Visualizing predicted vs actual values
+                            plt.figure(figsize=(5, 5))
+                            sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
+                            plt.xlabel('Actual Values')
+                            plt.ylabel('Predicted Values')
+                            plt.title('Actual vs Predicted Values')
+                            plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
 
-                            if "Subsample" in parameters:
-                                selected_subsamples = st.multiselect("Select Subsample Values", [0.5, 0.6, 0.7, 0.8, 0.9])
-                                if selected_subsamples:
-                                    param_grid['subsample'] = selected_subsamples
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.pyplot(plt)
+                            with col2:
+                                st.write(f"Mean Squared Error (MSE): {mse:.2f}")
+                                st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
+                                st.write(f"R-squared (R2): {r2:.2f}")
 
+                            template = "You will interpret the results from the XGBoost regression model highlighting only the key findings:"
+                            prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
+                            output = llama31_70b(prompt_text)
+                            st.write(output) 
+                    else:
+                        param_grid = {}
+                        if "Learning Rate" in parameters:
+                            selected_learning_rates = st.multiselect("Select Learning Rates", [0.01, 0.02, 0.05, 0.1, 0.2])
+                            if selected_learning_rates:
+                                param_grid['learning_rate'] = selected_learning_rates
+
+                        if "Maximum Depth" in parameters:
+                            selected_max_depths = st.multiselect("Select Maximum Depths", [2, 3, 4, 5, 6])
+                            if selected_max_depths:
+                                param_grid['max_depth'] = selected_max_depths
+
+                        if "Number of Estimators" in parameters:
+                            selected_estimators = st.multiselect("Select Number of Estimators", [10, 100, 1000, 2000, 4000])
+                            if selected_estimators:
+                                param_grid['n_estimators'] = selected_estimators
+
+                        if "Subsample" in parameters:
+                            selected_subsamples = st.multiselect("Select Subsample Values", [0.5, 0.6, 0.7, 0.8, 0.9])
+                            if selected_subsamples:
+                                param_grid['subsample'] = selected_subsamples
+
+                        start_training = st.button("Start Training!")
+                        if start_training == True:
                             X = df[features]
                             y = df[prediction_variable]
                             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
                             model = GridSearchCV(
-                                estimator=xgboost.XGBRegressor(),
-                                param_grid=param_grid,
-                                cv=5,
-                                scoring='neg_mean_squared_error',
-                                refit=True
-                            )
+                            estimator=xgboost.XGBRegressor(),
+                            param_grid=param_grid,
+                            cv=5,
+                            scoring='neg_mean_squared_error',
+                            refit=True
+                        )
                             model.fit(X_train, y_train)
                             optimal_params = model.best_params_
 
@@ -770,153 +910,218 @@ if uploaded_file is not None:
                                 optimal_learning_maxdepth = optimal_params.get("max_depth", "Not Selected")
                                 st.write("**Optimal Maximum Depth:**", optimal_learning_maxdepth)
 
-                    # Predict and evaluate regression results
-                    y_pred = model.predict(X_test)
+                # Predict and evaluate regression results
+                
+                            y_pred = model.predict(X_test)
 
-                    mse = mean_squared_error(y_test, y_pred)
-                    mae = mean_absolute_error(y_test, y_pred)
-                    r2 = r2_score(y_test, y_pred)
+                            mse = mean_squared_error(y_test, y_pred)
+                            mae = mean_absolute_error(y_test, y_pred)
+                            r2 = r2_score(y_test, y_pred)
 
-                    # Visualizing predicted vs actual values
-                    plt.figure(figsize=(5, 5))
-                    sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
-                    plt.xlabel('Actual Values')
-                    plt.ylabel('Predicted Values')
-                    plt.title('Actual vs Predicted Values')
-                    plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
+                            # Visualizing predicted vs actual values
+                            plt.figure(figsize=(5, 5))
+                            sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
+                            plt.xlabel('Actual Values')
+                            plt.ylabel('Predicted Values')
+                            plt.title('Actual vs Predicted Values')
+                            plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.pyplot(plt)
-                    with col2:
-                        st.write(f"Mean Squared Error (MSE): {mse:.2f}")
-                        st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
-                        st.write(f"R-squared (R2): {r2:.2f}")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.pyplot(plt)
+                            with col2:
+                                st.write(f"Mean Squared Error (MSE): {mse:.2f}")
+                                st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
+                                st.write(f"R-squared (R2): {r2:.2f}")
 
-                    template = "You will interpret the results from the XGBoost regression model highlighting only the key findings:"
-                    prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
-                    output = llama31_70b(prompt_text)
-                    st.write(output) 
-                elif method == "Random Forest":
-                    training_method = st.selectbox(
-                        "Select if you want to train the Random Forest model using the default parameter or utilize hyperparameter tuning to optimize the model",
-                        ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"],
-                        help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period"
-                    )
-                    
-                    X = df[features]
-                    y = df[prediction_variable]
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                    
-                    if training_method == "Default Parameters":
+                            template = "You will interpret the results from the XGBoost regression model highlighting only the key findings:"
+                            prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
+                            output = llama31_70b(prompt_text)
+                            st.write(output) 
+            elif method == "Random Forest":
+                training_method = st.selectbox(
+                    "Select if you want to train the Random Forest model using the default parameter or utilize hyperparameter tuning to optimize the model",
+                    ["Default Parameters", "Optimize Parameter via Hyperparameter Tuning"],
+                    help="Optimizing Parameters via Hyperparameter Tuning will result in a longer training period"
+                )
+                
+                X = df[features]
+                y = df[prediction_variable]
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                
+                if training_method == "Default Parameters":
+                    model = RandomForestRegressor()
+                    start_training = st.button("Start Training!")
+                    if start_training == True:
                         model = RandomForestRegressor()
                         model.fit(X_train, y_train)
+                        y_pred = model.predict(X_test)
+                        mse = mean_squared_error(y_test, y_pred)
+                        mae = mean_absolute_error(y_test, y_pred)
+                        r2 = r2_score(y_test, y_pred)
+
+                        # Visualization of actual vs predicted values
+                        plt.figure(figsize=(5, 5))
+                        sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
+                        plt.xlabel('Actual Values')
+                        plt.ylabel('Predicted Values')
+                        plt.title('Actual vs Predicted Values')
+                        plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.pyplot(plt)
+                        with col2:
+                            st.write(f"Mean Squared Error (MSE): {mse:.2f}")
+                            st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
+                            st.write(f"R-squared (R2): {r2:.2f}")
+
+                        template = "You will interpret the results from the Random Forest regression model highlighting only the key findings:"
+                        prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
+                        output = llama31_70b(prompt_text)
+                        st.write(output)
+                
+                else:
+                    st.write("""
+                        The following parameters can be tuned for hyperparameter optimization in the Random Forest algorithm:
+
+                        1. **Maximum Depth:** Determines the maximum depth of each tree in the forest. A deeper tree can capture more complex patterns in the data but may lead to overfitting if the depth is too high. Setting a limit on the depth of the trees helps control the model complexity and prevents overfitting.
+
+                        2. **Number of Estimators:** Specifies the number of trees to be built in the model (i.e., the size of the forest). A higher number of estimators can lead to better model performance by reducing variance and improving accuracy. However, this also increases computation time, so a balance must be struck between accuracy and computational efficiency.
+
+                        3. **Minimum Samples Split:** The minimum number of samples required to split an internal node. This parameter controls how deep the tree grows by ensuring that a node is split only if it contains at least the specified number of samples. Higher values prevent the model from learning overly specific patterns, thus reducing the risk of overfitting.
+
+                        4. **Minimum Samples Leaf:** The minimum number of samples required to be at a leaf node. This parameter helps prevent the model from creating nodes that contain very few data points, which can lead to overfitting. Setting this value higher forces the algorithm to generalize more by considering a larger number of samples at each leaf.
+
+                        5. **Maximum Features:** The maximum number of features considered for splitting a node. By limiting the number of features, this parameter introduces randomness into the model, making it more robust to overfitting and increasing the model's ability to generalize. The `sqrt` of the total number of features is often used as a default value for classification tasks, while `log2` is another common choice.
+                    """)
+                    
+                    approach = st.selectbox(
+                        "Select if you want to manually choose the parameters or automatically select the best hyperparameters",
+                        ["Manual", "Auto"]
+                    )
+                    
+                    parameters = st.multiselect(
+                        "Select the parameters to be tuned",
+                        ["Maximum Depth", "Number of Estimators", "Minimum Sample Split", "Minimum Samples Leaf", "Maximum Features"]
+                    )
+                    
+                    if approach == "Manual":
+                        param_grid = {}
+                        if "Maximum Depth" in parameters:
+                            param_grid['max_depth'] = st.slider("Maximum Depth", 1, 20, 10)
+                        else:
+                            param_grid['max_depth'] = None
+
+                        if "Maximum Features" in parameters:
+                            param_grid['max_features'] = st.selectbox("Maximum Features", ['sqrt', 'log2', 'None'])
+                        else:
+                            param_grid['max_features'] = 'sqrt'
+
+                        if "Number of Estimators" in parameters:
+                            param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 1000, 100)
+                        else:
+                            param_grid['n_estimators'] = 100
+
+                        if "Minimum Samples Leaf" in parameters:
+                            param_grid['min_samples_leaf'] = st.slider("Minimum Samples Leaf", 1, 5, 1)
+                        else:
+                            param_grid['min_samples_leaf'] = 1
+
+                        if "Minimum Samples Split" in parameters:
+                            param_grid['min_samples_split'] = st.slider("Minimum Sample Split", 2, 5, 2)
+                        else:
+                            param_grid['min_samples_split'] = 2
+
+                        
+                        start_training = st.button("Start Training!")
+                        if start_training == True:
+                            model = RandomForestRegressor(
+                            max_depth=param_grid['max_depth'],
+                            max_features=param_grid['max_features'],
+                            min_samples_leaf=param_grid['min_samples_leaf'],
+                            min_samples_split=param_grid['min_samples_split'],
+                            n_estimators=param_grid['n_estimators']
+                        )
+                            model.fit(X_train, y_train)
+                            y_pred = model.predict(X_test)
+
+                            mse = mean_squared_error(y_test, y_pred)
+                            mae = mean_absolute_error(y_test, y_pred)
+                            r2 = r2_score(y_test, y_pred)
+
+                            # Visualization of actual vs predicted values
+                            plt.figure(figsize=(5, 5))
+                            sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
+                            plt.xlabel('Actual Values')
+                            plt.ylabel('Predicted Values')
+                            plt.title('Actual vs Predicted Values')
+                            plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
+
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.pyplot(plt)
+                            with col2:
+                                st.write(f"Mean Squared Error (MSE): {mse:.2f}")
+                                st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
+                                st.write(f"R-squared (R2): {r2:.2f}")
+
+                            template = "You will interpret the results from the Random Forest regression model highlighting only the key findings:"
+                            prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
+                            output = llama31_70b(prompt_text)
+                            st.write(output)
+
+
+
+
                     
                     else:
-                        st.write("""
-                            The following parameters can be tuned for hyperparameter optimization in the Random Forest algorithm:
-
-                            1. **Maximum Depth:** Determines the maximum depth of each tree in the forest. A deeper tree can capture more complex patterns in the data but may lead to overfitting if the depth is too high. Setting a limit on the depth of the trees helps control the model complexity and prevents overfitting.
-
-                            2. **Number of Estimators:** Specifies the number of trees to be built in the model (i.e., the size of the forest). A higher number of estimators can lead to better model performance by reducing variance and improving accuracy. However, this also increases computation time, so a balance must be struck between accuracy and computational efficiency.
-
-                            3. **Minimum Samples Split:** The minimum number of samples required to split an internal node. This parameter controls how deep the tree grows by ensuring that a node is split only if it contains at least the specified number of samples. Higher values prevent the model from learning overly specific patterns, thus reducing the risk of overfitting.
-
-                            4. **Minimum Samples Leaf:** The minimum number of samples required to be at a leaf node. This parameter helps prevent the model from creating nodes that contain very few data points, which can lead to overfitting. Setting this value higher forces the algorithm to generalize more by considering a larger number of samples at each leaf.
-
-                            5. **Maximum Features:** The maximum number of features considered for splitting a node. By limiting the number of features, this parameter introduces randomness into the model, making it more robust to overfitting and increasing the model's ability to generalize. The `sqrt` of the total number of features is often used as a default value for classification tasks, while `log2` is another common choice.
-                        """)
-                        
-                        approach = st.selectbox(
-                            "Select if you want to manually choose the parameters or automatically select the best hyperparameters",
-                            ["Manual", "Auto"]
-                        )
-                        
-                        parameters = st.multiselect(
-                            "Select the parameters to be tuned",
-                            ["Maximum Depth", "Number of Estimators", "Minimum Sample Split", "Minimum Samples Leaf", "Maximum Features"]
-                        )
-                        
-                        if approach == "Manual":
-                            param_grid = {}
-                            if "Maximum Depth" in parameters:
-                                param_grid['max_depth'] = st.slider("Maximum Depth", 1, 20, 10)
-                            else:
-                                param_grid['max_depth'] = None
-
-                            if "Maximum Features" in parameters:
-                                param_grid['max_features'] = st.selectbox("Maximum Features", ['sqrt', 'log2', 'None'])
-                            else:
-                                param_grid['max_features'] = 'sqrt'
-
-                            if "Number of Estimators" in parameters:
-                                param_grid['n_estimators'] = st.slider("Number of Estimators", 50, 1000, 100)
-                            else:
-                                param_grid['n_estimators'] = 100
-
-                            if "Minimum Samples Leaf" in parameters:
-                                param_grid['min_samples_leaf'] = st.slider("Minimum Samples Leaf", 1, 5, 1)
-                            else:
-                                param_grid['min_samples_leaf'] = 1
-
-                            if "Minimum Samples Split" in parameters:
-                                param_grid['min_samples_split'] = st.slider("Minimum Sample Split", 2, 5, 2)
-                            else:
-                                param_grid['min_samples_split'] = 2
-
-                            model = RandomForestRegressor(
-                                max_depth=param_grid['max_depth'],
-                                max_features=param_grid['max_features'],
-                                min_samples_leaf=param_grid['min_samples_leaf'],
-                                min_samples_split=param_grid['min_samples_split'],
-                                n_estimators=param_grid['n_estimators']
-                            )
-                            model.fit(X_train, y_train)
-                        
+                        param_grid = {}
+                        if "Maximum Depth" in parameters:
+                            selected_max_depths = st.multiselect("Select Maximum Depths", [1, 2, 3, 4, 5, 10, 15, 20])
+                            if selected_max_depths:
+                                param_grid['max_depth'] = selected_max_depths
                         else:
-                            param_grid = {}
-                            if "Maximum Depth" in parameters:
-                                selected_max_depths = st.multiselect("Select Maximum Depths", [1, 2, 3, 4, 5, 10, 15, 20])
-                                if selected_max_depths:
-                                    param_grid['max_depth'] = selected_max_depths
-                            else:
-                                param_grid['max_depth'] = [None]
+                            param_grid['max_depth'] = [None]
 
-                            if "Maximum Features" in parameters:
-                                selected_max_features = st.multiselect("Select Maximum Features", ['sqrt', 'log2', None])
-                                if selected_max_features:
-                                    param_grid['max_features'] = selected_max_features
-                            else:
-                                param_grid['max_features'] = ['sqrt']
+                        if "Maximum Features" in parameters:
+                            selected_max_features = st.multiselect("Select Maximum Features", ['sqrt', 'log2', None])
+                            if selected_max_features:
+                                param_grid['max_features'] = selected_max_features
+                        else:
+                            param_grid['max_features'] = ['sqrt']
 
-                            if "Number of Estimators" in parameters:
-                                selected_estimators = st.multiselect("Select Number of Estimators", [50, 100, 200, 500, 1000])
-                                if selected_estimators:
-                                    param_grid['n_estimators'] = selected_estimators
-                            else:
-                                param_grid['n_estimators'] = [100]
+                        if "Number of Estimators" in parameters:
+                            selected_estimators = st.multiselect("Select Number of Estimators", [50, 100, 200, 500, 1000])
+                            if selected_estimators:
+                                param_grid['n_estimators'] = selected_estimators
+                        else:
+                            param_grid['n_estimators'] = [100]
 
-                            if "Minimum Samples Leaf" in parameters:
-                                selected_min_samples_leaf = st.multiselect("Select Minimum Samples Leaf", [1, 2, 3, 4, 5])
-                                if selected_min_samples_leaf:
-                                    param_grid['min_samples_leaf'] = selected_min_samples_leaf
-                            else:
-                                param_grid['min_samples_leaf'] = [1]
+                        if "Minimum Samples Leaf" in parameters:
+                            selected_min_samples_leaf = st.multiselect("Select Minimum Samples Leaf", [1, 2, 3, 4, 5])
+                            if selected_min_samples_leaf:
+                                param_grid['min_samples_leaf'] = selected_min_samples_leaf
+                        else:
+                            param_grid['min_samples_leaf'] = [1]
 
-                            if "Minimum Samples Split" in parameters:
-                                selected_min_samples_split = st.multiselect("Select Minimum Sample Split", [2, 3, 4, 5])
-                                if selected_min_samples_split:
-                                    param_grid['min_samples_split'] = selected_min_samples_split
-                            else:
-                                param_grid['min_samples_split'] = [2]
+                        if "Minimum Samples Split" in parameters:
+                            selected_min_samples_split = st.multiselect("Select Minimum Sample Split", [2, 3, 4, 5])
+                            if selected_min_samples_split:
+                                param_grid['min_samples_split'] = selected_min_samples_split
+                        else:
+                            param_grid['min_samples_split'] = [2]
 
+                        
+                        start_training = st.button("Start Training!")
+                        if start_training == True:
                             model = GridSearchCV(
-                                estimator=RandomForestRegressor(),
-                                param_grid=param_grid,
-                                cv=5,
-                                scoring='neg_mean_squared_error',
-                                refit=True
-                            )
+                            estimator=RandomForestRegressor(),
+                            param_grid=param_grid,
+                            cv=5,
+                            scoring='neg_mean_squared_error',
+                            refit=True
+                        )
                             model.fit(X_train, y_train)
                             optimal_params = model.best_params_
 
@@ -940,35 +1145,35 @@ if uploaded_file is not None:
                                 optimal_min_samples_split = optimal_params.get("min_samples_split", "Not Selected")
                                 st.write("**Optimal Minimum Sample Split:**", optimal_min_samples_split)
 
-                    # Predictions and evaluation
-                    y_pred = model.predict(X_test)
+                        # Predictions and evaluation
+                            y_pred = model.predict(X_test)
 
-                    mse = mean_squared_error(y_test, y_pred)
-                    mae = mean_absolute_error(y_test, y_pred)
-                    r2 = r2_score(y_test, y_pred)
+                            mse = mean_squared_error(y_test, y_pred)
+                            mae = mean_absolute_error(y_test, y_pred)
+                            r2 = r2_score(y_test, y_pred)
 
-                    # Visualization of actual vs predicted values
-                    plt.figure(figsize=(5, 5))
-                    sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
-                    plt.xlabel('Actual Values')
-                    plt.ylabel('Predicted Values')
-                    plt.title('Actual vs Predicted Values')
-                    plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
+                            # Visualization of actual vs predicted values
+                            plt.figure(figsize=(5, 5))
+                            sns.scatterplot(x=y_test, y=y_pred, alpha=0.7)
+                            plt.xlabel('Actual Values')
+                            plt.ylabel('Predicted Values')
+                            plt.title('Actual vs Predicted Values')
+                            plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', linewidth=2)
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.pyplot(plt)
-                    with col2:
-                        st.write(f"Mean Squared Error (MSE): {mse:.2f}")
-                        st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
-                        st.write(f"R-squared (R2): {r2:.2f}")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.pyplot(plt)
+                            with col2:
+                                st.write(f"Mean Squared Error (MSE): {mse:.2f}")
+                                st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
+                                st.write(f"R-squared (R2): {r2:.2f}")
 
-                    template = "You will interpret the results from the Random Forest regression model highlighting only the key findings:"
-                    prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
-                    output = llama31_70b(prompt_text)
-                    st.write(output)
-                else:
-                    st.write(f"The {method} method has not bee released yet. Stay Tuned!")
+                            template = "You will interpret the results from the Random Forest regression model highlighting only the key findings:"
+                            prompt_text = template + f"\nMSE: {mse}\nMAE: {mae}\nR2: {r2}"
+                            output = llama31_70b(prompt_text)
+                            st.write(output)
+            else:
+                st.write(f"The {method} method has not bee released yet. Stay Tuned!")
 
 
     elif analysis_mode == "Data Vizualisation":
