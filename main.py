@@ -21,7 +21,6 @@ import seaborn as sns
 import time
 import xgboost
 import requests
-from streamlit_lottie import st_lottie
 client = Groq(api_key= "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")
 
 
