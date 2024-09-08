@@ -1,5 +1,7 @@
 import streamlit as st
 import os
+from sklearn.datasets import fetch_california_housing
+import base64
 import pandas as pd
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import pandas as pd
@@ -18,7 +20,15 @@ from groq import Groq
 import seaborn as sns
 import time
 import xgboost
+import requests
+from streamlit_lottie import st_lottie
 client = Groq(api_key= "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")
+
+
+def get_video_as_base64(file_path):
+    with open(file_path, "rb") as video_file:
+        video_bytes = video_file.read()
+    return base64.b64encode(video_bytes).decode()
 
 def identify_variable_types(df):
     """
@@ -74,32 +84,99 @@ def llama31_70b(prompt, temperature=0.0, input_print=True):
 st.set_page_config(page_title="Data Intelligence Hub", page_icon=":rocket", layout="wide")
 
 
-st.title("Welcome to The Data Intelligence Hub")
+# st.title("Welcome to The Data Intelligence Hub")
 
+
+# Set a background image using CSS
 page_bg_img = '''
 <style>
 .stApp {
-background-image: url("https://w0.peakpx.com/wallpaper/855/509/HD-wallpaper-simple-background-edit-and-simple-design.jpg");
-background-size: cover;
-background-repeat: no-repeat;
-background-attachment: fixed;
+    background-image: url("https://w0.peakpx.com/wallpaper/855/509/HD-wallpaper-simple-background-edit-and-simple-design.jpg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
 }
 
 [data-testid="stHeader"] {
-background-color: rgba(0, 0, 0, 0)
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.lottie-container {
+    background: transparent !important;  /* Ensures Lottie animation has no background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: auto;  /* Adjust as needed */
+    width: auto;  /* Adjust as needed */
+    margin-top: 20px; /* Optional: Adjust margin for positioning */
 }
 </style>
 '''
 
+# Apply CSS
 st.markdown(page_bg_img, unsafe_allow_html=True)
 
+st.title("Welcome to The Data Intelligence Hub 🚀")
 typewriter("Unlock the potential of your data with our self-service analytics tool, designed for professionals at every level. Seamlessly perform advanced analyses such as regression, clustering, and predictive modeling—no coding required. Empower your decision-making with actionable insights at your fingertips.", speed=speed)
+st.markdown("---")
+video_base64 = get_video_as_base64("Data App Demo.mp4")
 
-uploaded_file = st.file_uploader("Upload your dataset in CSV", type="csv")
+# Create the HTML for the video with custom size
+video_html = f"""
+<video width="600" height="400" controls autoplay loop>
+  <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+"""
 
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
+# Divide layout into two columns
+col2, col1 = st.columns([1, 1])  # Adjust the width ratio if needed
 
+# Render the video in the first column
+with col1:
+    st.markdown(video_html, unsafe_allow_html=True)
+
+# Render the text in the second column
+with col2:
+    st.subheader("How Can the Data Intelligence Hub Help You?")
+    st.write("""
+    As your Data Science Agent, the Data Intelligence Hub platform enables you to develop robust data science solutions effortlessly, without any coding. It provides intelligent recommendations throughout the process and interprets results for you, ensuring a seamless experience. Here’s what you can do:
+
+    - Ensure your data meets quality and completeness standards
+    - Build statistical regression models with ease
+    - Perform clustering analysis to discover hidden patterns
+    - Develop predictive machine learning models
+    - Utilize dimensionality reduction techniques (Coming soon...)
+    - Conduct hypothesis testing to validate insights (Coming soon...)
+    - And much more!
+    """)
+
+st.markdown("---")
+# File uploader for user's dataset
+uploaded_file = st.file_uploader("Upload Your Dataset", type=["csv", "xlxs", "xls"])
+
+# Improved text for users who don't have a dataset
+st.write("Don't have a dataset? No problem! You can explore the app using one of our sample datasets below.")
+
+# Selection box for built-in datasets
+selected_dataset = st.selectbox(
+    "Choose a sample dataset to get started:",
+    ["No Selection", "Student Performance Dataset", "Housing Market Dataset"]
+)
+
+# Visual touch to separate sections
+st.markdown("---")
+
+
+if uploaded_file is not None or selected_dataset != "No Selection":
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+    else:
+        if selected_dataset == "Housing Market Dataset":
+            df = fetch_california_housing()
+            df = pd.DataFrame(df.data, columns=df.feature_names)
+        elif selected_dataset == "Student Performance Dataset":
+            df = pd.read_csv("Student_performance_data.csv")
     st.subheader("Data Preview")
     st.write(df.head(5))
 
@@ -121,7 +198,7 @@ if uploaded_file is not None:
 
 
     st.subheader("Let's Get Started")
-    analysis_modes = ["Regression Analysis", "Clustering Analysis", "Predictive Analysis", "Data Vizualisation", "Text Analysis", "Dimensionality Reduction", "Hypthesis Testing"]
+    analysis_modes = ["Regression Analysis", "Clustering Analysis", "Predictive Analysis", "Data Vizualisation", "Text Analysis", "Dimensionality Reduction", "Hyppthesis Testing"]
     analysis_mode = st.selectbox("Select Data Analysis Mode", analysis_modes)
 
     if analysis_mode == "Regression Analysis":
@@ -153,14 +230,31 @@ if uploaded_file is not None:
                 y = df[y]
                 model = sm.OLS(y, X).fit_regularized(alpha=1.0, L1_wt=0.0)
                 # results = model.fit()
-                st.write(model.params)
+                # st.write(model.params)
+                coefficients = pd.DataFrame(model.params, index=X.columns, columns=['Coefficient'])
+                st.write(coefficients.style.background_gradient(cmap='coolwarm').format(precision=4))
+                y_pred = np.dot(X, model.params)
+                ss_total = np.sum((y - np.mean(y)) ** 2)
+                ss_residual = np.sum((y - y_pred) ** 2)
+                r_squared = 1 - (ss_residual / ss_total)
+                st.write(f"**R-squared**: {r_squared:.4f}")
+
+
+                # Visualize the coefficients using a bar plot
         elif regression_model == "LASSO Regression":
             if X:
                 X = df[X]
                 y = df[y]
-                model = sm.OLS(y, X).fit_regularized(alpha=0.0, L1_wt=1.0)
+                model = sm.OLS(y, X).fit_regularized(alpha=1.0, L1_wt=1.0)
                 # results = model.fit()
-                st.write(model.params) 
+                # st.write(model.params) 
+                coefficients = pd.DataFrame(model.params, index=X.columns, columns=['Coefficient'])
+                st.write(coefficients.style.background_gradient(cmap='coolwarm').format(precision=4))
+                y_pred = np.dot(X, model.params)
+                ss_total = np.sum((y - np.mean(y)) ** 2)
+                ss_residual = np.sum((y - y_pred) ** 2)
+                r_squared = 1 - (ss_residual / ss_total)
+                st.write(f"**R-squared**: {r_squared:.4f}")
 
         elif regression_model == "Elastic Net Regression":
             if X:
@@ -168,7 +262,14 @@ if uploaded_file is not None:
                 y = df[y]
                 model = sm.OLS(y, X).fit_regularized(alpha=0.5, L1_wt=0.5)
                 # results = model.fit()
-                st.write(model.params)      
+                # st.write(model.params) 
+                coefficients = pd.DataFrame(model.params, index=X.columns, columns=['Coefficient'])
+                st.write(coefficients.style.background_gradient(cmap='coolwarm').format(precision=4))
+                y_pred = np.dot(X, model.params)
+                ss_total = np.sum((y - np.mean(y)) ** 2)
+                ss_residual = np.sum((y - y_pred) ** 2)
+                r_squared = 1 - (ss_residual / ss_total)
+                st.write(f"**R-squared**: {r_squared:.4f}")     
 
     elif analysis_mode == "Clustering Analysis":
         st.subheader("Clustering Analysis")
