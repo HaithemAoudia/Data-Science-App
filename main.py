@@ -119,15 +119,15 @@ st.title("Welcome to The Data Intelligence Hub 🚀")
 typewriter("Unlock the potential of your data with our self-service analytics tool, designed for professionals at every level. Seamlessly perform advanced analyses such as regression, clustering, and predictive modeling—no coding required. Empower your decision-making with actionable insights at your fingertips.", speed=speed)
 st.markdown("---")
 
-with st.spinner('Setting up your enviroment...'):
+with st.spinner('Setting up your environment...'):
     video_base64 = get_video_as_base64("Data App Demo.mp4")
     
     # Create the HTML for the video with custom size
     video_html = f"""
-<video width="600" height="400" controls autoplay muted loop>
+    <video width="600" height="400" controls autoplay muted loop>
   <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
   Your browser does not support the video tag.
-</video>
+            </video>
 """
     
     # Divide layout into two columns
