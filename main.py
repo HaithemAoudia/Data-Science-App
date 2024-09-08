@@ -124,11 +124,11 @@ with st.spinner('Setting up your enviroment...'):
     
     # Create the HTML for the video with custom size
     video_html = f"""
-    <video width="600" height="400" controls autoplay loop>
-      <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
-      Your browser does not support the video tag.
-    </video>
-    """
+<video width="600" height="400" controls autoplay muted loop>
+  <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+"""
     
     # Divide layout into two columns
     col2, col1 = st.columns([1, 1])  # Adjust the width ratio if needed
