@@ -118,38 +118,40 @@ st.markdown(page_bg_img, unsafe_allow_html=True)
 st.title("Welcome to The Data Intelligence Hub 🚀")
 typewriter("Unlock the potential of your data with our self-service analytics tool, designed for professionals at every level. Seamlessly perform advanced analyses such as regression, clustering, and predictive modeling—no coding required. Empower your decision-making with actionable insights at your fingertips.", speed=speed)
 st.markdown("---")
-video_base64 = get_video_as_base64("Data App Demo.mp4")
 
-# Create the HTML for the video with custom size
-video_html = f"""
-<video width="600" height="400" controls autoplay loop>
-  <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-"""
-
-# Divide layout into two columns
-col2, col1 = st.columns([1, 1])  # Adjust the width ratio if needed
-
-# Render the video in the first column
-with col1:
-    st.markdown(video_html, unsafe_allow_html=True)
-
-# Render the text in the second column
-with col2:
-    st.subheader("How Can the Data Intelligence Hub Help You?")
-    st.write("""
-    As your Data Science Agent, the Data Intelligence Hub platform enables you to develop robust data science solutions effortlessly, without any coding. It provides intelligent recommendations throughout the process and interprets results for you, ensuring a seamless experience. Here’s what you can do:
-
-    - Ensure your data meets quality and completeness standards
-    - Build statistical regression models with ease
-    - Perform clustering analysis to discover hidden patterns
-    - Develop predictive machine learning models
-    - Utilize dimensionality reduction techniques (Coming soon...)
-    - Conduct hypothesis testing to validate insights (Coming soon...)
-    - And much more!
-    """)
-
+with st.spinner('Setting up your enviroment...'):
+    video_base64 = get_video_as_base64("Data App Demo.mp4")
+    
+    # Create the HTML for the video with custom size
+    video_html = f"""
+    <video width="600" height="400" controls autoplay loop>
+      <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+    """
+    
+    # Divide layout into two columns
+    col2, col1 = st.columns([1, 1])  # Adjust the width ratio if needed
+    
+    # Render the video in the first column
+    with col1:
+        st.markdown(video_html, unsafe_allow_html=True)
+    
+    # Render the text in the second column
+    with col2:
+        st.subheader("How Can the Data Intelligence Hub Help You?")
+        st.write("""
+        As your Data Science Agent, the Data Intelligence Hub platform enables you to develop robust data science solutions effortlessly, without any coding. It provides intelligent recommendations throughout the process and interprets results for you, ensuring a seamless experience. Here’s what you can do:
+    
+        - Ensure your data meets quality and completeness standards
+        - Build statistical regression models with ease
+        - Perform clustering analysis to discover hidden patterns
+        - Develop predictive machine learning models
+        - Utilize dimensionality reduction techniques (Coming soon...)
+        - Conduct hypothesis testing to validate insights (Coming soon...)
+        - And much more!
+        """)
+    
 st.markdown("---")
 # File uploader for user's dataset
 uploaded_file = st.file_uploader("Upload Your Dataset", type=["csv", "xlxs", "xls"])
