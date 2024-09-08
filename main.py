@@ -199,7 +199,7 @@ if uploaded_file is not None or selected_dataset != "No Selection":
 
 
     st.subheader("Let's Get Started")
-    analysis_modes = ["Regression Analysis", "Clustering Analysis", "Predictive Analysis", "Data Vizualisation", "Text Analysis", "Dimensionality Reduction", "Hyppthesis Testing"]
+    analysis_modes = ["Regression Analysis", "Clustering Analysis", "Predictive Analysis", "Data Vizualisation", "Text Analysis", "Dimensionality Reduction", "Hypothesis Testing"]
     analysis_mode = st.selectbox("Select Data Analysis Mode", analysis_modes)
 
     if analysis_mode == "Regression Analysis":
