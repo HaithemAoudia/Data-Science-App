@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import plotly.express as px
 from sklearn.datasets import fetch_california_housing
 import base64
 import pandas as pd
@@ -795,7 +796,7 @@ if uploaded_file is not None or selected_dataset != "No Selection":
                             output = llama31_70b(prompt_text)
                             st.write(output)
             else:
-                st.write(f"The {method} method has not been released yet. Stay Tuned!")
+                st.write(f"The {method} method has not bee released yet. Stay Tuned!")
         else:
             if method == 'SVM':
                 X = df[features]
@@ -1277,18 +1278,151 @@ if uploaded_file is not None or selected_dataset != "No Selection":
                             output = llama31_70b(prompt_text)
                             st.write(output)
             else:
-                st.write(f"The {method} method has not been released yet. Stay Tuned!")
+                st.write(f"The {method} method has not bee released yet. Stay Tuned!")
 
 
     elif analysis_mode == "Data Vizualisation":
         st.subheader("Data Vizualisation")
-        st.write(f"The {analysis_mode} analysis mode has not been released yet. Stay Tuned!")
+
+        tab1, tab2, tab3 = st.tabs(["Single Attribute Vizualisation", "Multi Attribute Vizualisation", "Advanced Vizualisation"])
+
+        with tab1: 
+            st.subheader("Single Attribute Vizualisation")
+            variable = st.selectbox("Select the variable you want to visualize", df.columns)
+            chart = st.selectbox("Select the visualization type", ["Pie Chart", "Donut Chart", "Bar Chart", 
+                                                                   "Histogram", "Boxplot"])
+
+            if chart == "Pie Chart":
+                st.write("Pie Chart")
+                var_counts = df[variable].value_counts().reset_index()
+                var_counts.columns = [variable, 'Count']
+                
+                # Use Plotly pie chart with enhancements
+                fig = px.pie(var_counts, names=variable, values='Count', 
+                            title=f"{variable} Pie Chart", 
+                            color_discrete_sequence=px.colors.qualitative.Pastel)  # Use a more appealing color scheme
+                
+                # Update layout for better appearance
+                fig.update_traces(textposition='inside', textinfo='percent+label')  # Display percentages and labels inside slices
+                
+                # Customize title and layout
+                fig.update_layout(
+                    title=dict(font=dict(size=20), x=0.43),  # Center title and increase font size
+                    height=400,  # Adjust chart height
+                    margin=dict(t=50, b=0, l=0, r=0)  # Adjust margins for better fitting
+                )
+                
+                st.plotly_chart(fig)
+
+                data_type = identify_variable_types(df)
+
+                if variable in data_type['continuous']:
+                    st.write(f"{variable} is a continuous variable, which makes it unsuitable for a pie chart. For better representation, consider using a histogram or boxplot instead.")
+
+            elif chart == "Donut Chart":
+                st.write("Donut Chart")
+                var_counts = df[variable].value_counts().reset_index()
+                var_counts.columns = [variable, 'Count']
+                
+                # Use Plotly pie chart with hole parameter to create a donut chart
+                fig = px.pie(var_counts, names=variable, values='Count', 
+                            title=f"{variable} Donut Chart", 
+                            color_discrete_sequence=px.colors.qualitative.Pastel,
+                            hole=0.4)  # Set hole size to create the donut effect
+                
+                # Update layout for better appearance
+                fig.update_traces(textposition='inside', textinfo='percent+label')  # Display percentages and labels inside slices
+                
+                # Customize title and layout
+                fig.update_layout(
+                    title=dict(font=dict(size=20), x=0.43),  # Center title and increase font size
+                    height=400,  # Adjust chart height
+                    margin=dict(t=50, b=0, l=0, r=0)  # Adjust margins for better fitting
+                )
+                
+                st.plotly_chart(fig)
+
+                data_type = identify_variable_types(df)
+
+                if variable in data_type['continuous']:
+                    st.write(f"{variable} is a continuous variable, which makes it unsuitable for a donut chart. For better representation, consider using a histogram or boxplot instead.")
+
+            elif chart == "Bar Chart":
+                st.write("Bar Chart")
+                var_counts = df[variable].value_counts().reset_index()
+                var_counts.columns = [variable, 'Count']
+                fig = px.bar(var_counts, x=variable, y='Count', title=f"{variable} Bar Chart", color_discrete_sequence=px.colors.qualitative.Pastel)
+                
+                # Customize title and layout
+                fig.update_layout(
+                    title=dict(font=dict(size=20), x=0.43),  # Center title and increase font size
+                    height=400,  # Adjust chart height
+                    margin=dict(t=50, b=0, l=0, r=0)  # Adjust margins for better fitting
+                )
+                
+                st.plotly_chart(fig)
+
+                data_type = identify_variable_types(df)
+
+                if variable in data_type['continuous']:
+                    st.write(f"{variable} is a continuous variable, which makes it unsuitable for a bar chart. For better representation, consider using a histogram or boxplot instead.")
+
+            elif chart == "Histogram":
+                st.write("Histogram")
+                var_counts = df[variable].value_counts().reset_index()
+                var_counts.columns = [variable, 'Count']
+                                
+                # Create a histogram using Plotly with enhanced visuals
+                fig = px.histogram(var_counts, x=variable, y='Count', 
+                            title=f"Distribution of {variable}", text_auto=True)  # Use a more appealing color scheme
+
+                # Customize the layout for better appearance
+                fig.update_layout(
+                    title=dict(font=dict(size=20), x=0.43),  # Center the title and adjust font size
+                    xaxis_title=f"{variable}",  # Set x-axis title
+                    yaxis_title="Count",  # Set y-axis title
+                    height=500,  # Adjust the height of the chart
+                    margin=dict(t=50, b=50, l=50, r=50),
+                    plot_bgcolor='rgba(0,0,0,0)',  # Set a transparent background
+                )
+                # Display the enhanced histogram
+                st.plotly_chart(fig)
+
+            elif chart == "Boxplot":
+                st.write("Boxplot")
+                var_counts = df[variable].value_counts().reset_index()
+                var_counts.columns = [variable, 'Count']
+
+                fig = px.box(df, y= variable, title=f"Distribution of {variable}")
+
+                fig.update_layout(
+                    title=dict(font=dict(size=20), x=0.42),  # Center the title and adjust font size
+                    xaxis_title=f"{variable}",  # Set x-axis title
+                    yaxis_title="Count",  # Set y-axis title
+                    height=500,  # Adjust the height of the chart
+                    margin=dict(t=50, b=50, l=50, r=50),
+                    plot_bgcolor='rgba(0,0,0,0)',  # Set a transparent background
+                )
+                # Display the enhanced histogram
+                st.plotly_chart(fig)
+
+
         
+        with tab2:
+            st.subheader("Multi Attribute Vizualisation")
+            # variable = st.selectbox("Select the variable you want to visualize", df.columns)
+            # chart = st.selectbox("Select the visualization type", ["Pie Chart", "Donut Chart", "Bar Chart", 
+            #                                                        "Histogram", "Boxplot", "Scatter plot", "Line chart"])
+            st.write("The Multi Attribute Vizualisation analysis mode has not bee released yet. Stay Tuned!")
+
+        with tab3:
+            st.subheader("Advanced Vizualisation")
+            st.write("The Advanced Vizualisation analysis mode has not bee released yet. Stay Tuned!")
 
 
     elif analysis_mode == "Text Analysis":
         st.subheader("Text Analysis")
-        st.write(f"The {analysis_mode} analysis mode has not been released yet. Stay Tuned!")
+        st.write(f"The {analysis_mode} analysis mode has not bee released yet. Stay Tuned!")
 
 
     elif analysis_mode == "Dimensionality Reduction":
@@ -1297,7 +1431,8 @@ if uploaded_file is not None or selected_dataset != "No Selection":
 
     elif analysis_mode == "Hypothesis Testing":
         st.subheader("Hypothesis Testing")
-        st.write(f"The {analysis_mode} analysis mode has not been released yet. Stay Tuned!")
+        st.write(f"The {analysis_mode} analysis mode has not bee released yet. Stay Tuned!")
+
 
 
 
