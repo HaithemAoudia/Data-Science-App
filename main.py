@@ -15,10 +15,12 @@ from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.svm import SVC, SVR
+from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 from DataCleaningFunctions import completness_ratio, data_val_erroneous, data_val_duplicates
 from groq import Groq
 import seaborn as sns
+import plotly.graph_objects as go
 import time
 import xgboost
 import requests
@@ -1408,16 +1410,224 @@ if uploaded_file is not None or selected_dataset != "No Selection":
 
 
         
-        with tab2:
-            st.subheader("Multi Attribute Vizualisation")
-            # variable = st.selectbox("Select the variable you want to visualize", df.columns)
-            # chart = st.selectbox("Select the visualization type", ["Pie Chart", "Donut Chart", "Bar Chart", 
-            #                                                        "Histogram", "Boxplot", "Scatter plot", "Line chart"])
-            st.write("The Multi Attribute Vizualisation analysis mode has not bee released yet. Stay Tuned!")
+            with tab2:
+                st.subheader("Multi Attribute Visualization")
+
+                # Step 1: Add all the numerical variables that can be visualized
+                variable = st.multiselect("Select the variables you want to visualize", df.columns)    
+                data_types = identify_variable_types(df)
+                
+                # if any(var in data_types["continuous"] for var in variable) and any(var in data_types['discrete'] for var in variable):
+                #     st.write("It looks like you've selected both numerical and categorical variables. Select only one variable type to visualize at a time.")
+                # else:
+                #     st.write("Proceed with visualization.")
+                chart = st.selectbox("Select the visualization type", ["Donut Chart", "Bar Chart", 
+                                                                    "Histogram", "Boxplot", "Scatter plot"])
+                
+                if any(var in data_types["continuous"] for var in variable):
+                    st.write("You cannot visualize continuous variables in a Donut Chart")
+                else:
+                    if len(variable) > 1:
+                        if chart == "Donut Chart":
+                            st.write("Donut Chart")
+                            
+
+                            # Group the data by selected variables and count occurrences
+                            df_groupedby = df.groupby(variable).size().reset_index(name='Count')
+
+                            # Get unique values of the first variable
+                            labels = df[variable[0]].unique()
+
+                            # Get the unique values of the second variable to determine the number of subplots
+                            unique_groups = df[variable[1]].unique()
+
+                            # Create a list of dictionaries for the specs, one 'domain' type for each column
+                            specs = [[{'type':'domain'}] * len(unique_groups)]
+
+                            # Create the subplot figure with dynamic number of columns
+                            fig = make_subplots(rows=1, cols=len(unique_groups), specs=specs, subplot_titles=[f"{group} Distribution" for group in unique_groups])
+
+                            # Loop through the unique groups and add a Pie chart trace for each one
+                            for i, group in enumerate(unique_groups):
+                                fig.add_trace(
+                                    go.Pie(labels=labels, values=df_groupedby[df_groupedby[variable[1]] == group]['Count'], 
+                                        name=f"Group {group}", marker=dict(colors=px.colors.qualitative.Plotly)), 
+                                    row=1, col=i+1
+                                )
+
+                            # Update traces to show as donut charts with improved hover info and percentage formatting
+                            fig.update_traces(
+                            hole=.4, 
+                            hoverinfo="label+percent+name")
+
+                            # Add annotations dynamically for each pie chart, centering text inside each donut
+                            annotations = [
+                    dict(text=f"{variable[1]} {group}", x=(i + 0.5)/len(unique_groups), y=0.5, font_size=20, showarrow=False, xanchor="center") 
+                    for i, group in enumerate(unique_groups)
+                ]
+
+                
+                            fig.update_layout(
+                                title_text=f"Distribution of {variable[0]} across {variable[1]} groups",
+                                title= dict(font=dict(size=20), x=0.40), 
+                                annotations=annotations,
+                                showlegend=True,  
+                                margin=dict(t=50, b=50),  
+                                paper_bgcolor="White"   
+                            )
+
+                            # Display the Plotly chart in Streamlit
+                            st.plotly_chart(fig)
+
+                            data_type = identify_variable_types(df)
+
+                            if variable in data_type['continuous']:
+                                st.write(f"{variable} is a continuous variable, which makes it unsuitable for a pie chart. For better representation, consider using a histogram or boxplot instead.")
+
+                if chart == "Bar Chart":
+                    st.subheader("Multi Attribute Visualization")
+
+                    data_types = identify_variable_types(df)
+                    
+                    # Ensure that a continuous and a categorical variable are selected
+                    if len(variable) == 2 and any(var in data_types["continuous"] for var in variable) and any(var in data_types['discrete'] for var in variable):
+                        st.write("Proceed with bar chart visualization.")
+                        
+                        # Determine which variable is categorical and which is continuous
+                        x_var = [var for var in variable if var in data_types['discrete']][0]  # Categorical variable for x-axis
+                        y_var = [var for var in variable if var in data_types['continuous']][0]  # Continuous variable for y-axis
+                        
+                        # Group the data by the x-variable (categorical) and calculate the mean or sum of the y-variable
+                        df_grouped = df.groupby(x_var)[y_var].mean().reset_index()  # You can change this to .sum() or other aggregation if needed
+                        
+                        # Create a bar chart using Plotly
+                        fig = go.Figure(data=[
+                            go.Bar(x=df_grouped[x_var], y=df_grouped[y_var], marker=dict(color='skyblue'))  # Set bar color
+                        ])
+                        
+                        # Update layout for better visual appeal
+                        fig.update_layout(
+                            title_text=f"Bar Chart of {y_var} by {x_var}",
+                            title= dict(font=dict(size=20), x=0.40),
+                            xaxis_title=x_var,
+                            yaxis_title=y_var,
+                            paper_bgcolor="White",  # Background color to improve visual appeal
+                            plot_bgcolor="white",  # Background for the plot itself
+                            margin=dict(t=50, b=50),  # Adjust margins for better spacing
+                            bargap=0.2  # Space between bars
+                        )
+                        
+                        # Display the Plotly bar chart in Streamlit
+                        st.plotly_chart(fig)
+
+                    else:
+                        st.write("Please select one continuous and one categorical variable for visualization.")
+                elif chart == "Histogram":
+                    data_types = identify_variable_types(df)
+
+                    # Ensure that one continuous and one categorical variable are selected
+                    if len(variable) == 2 and any(var in data_types["continuous"] for var in variable) and any(var in data_types['discrete'] for var in variable):
+                        st.write("Proceed with histogram visualization.")
+                        
+                        # Determine which variable is continuous and which is categorical
+                        x_var = [var for var in variable if var in data_types['continuous']][0]  # Continuous variable for x-axis
+                        color_var = [var for var in variable if var in data_types['discrete']][0]  # Categorical variable for color
+
+                        # Create a histogram using Plotly
+                        fig = px.histogram(df, x=x_var, color=color_var, 
+                                        title=f"Histogram of {x_var} grouped by {color_var}",
+                                        labels={x_var: x_var, color_var: color_var},  # Axis and color labels
+                                        nbins=20,  # You can adjust the number of bins as needed
+                                        color_discrete_sequence=px.colors.qualitative.Plotly)  # Color scheme
+                        
+                        # Update layout for better visual appeal
+                        fig.update_layout(title_text=f"Histogram of {x_var} by {color_var}",
+                            title=dict(font=dict(size=20), x=0.40),
+                            xaxis_title=x_var,
+                            yaxis_title="Frequency",
+                            paper_bgcolor="White",  # Background color to improve visual appeal
+                            plot_bgcolor="white",  # Background for the plot itself
+                            margin=dict(t=50, b=50),  # Adjust margins for better spacing
+                        )
+                        
+                        # Display the Plotly histogram in Streamlit
+                        st.plotly_chart(fig)
+
+                    else:
+                        st.write("Please select one continuous and one categorical variable for visualization.")
+                elif chart == "Boxplot":
+                    data_types = identify_variable_types(df)
+                    
+                    # Ensure that one continuous and one categorical variable are selected
+                    if len(variable) == 2 and any(var in data_types["continuous"] for var in variable) and any(var in data_types['discrete'] for var in variable):
+                        st.write("Proceed with box plot visualization.")
+                        
+                        # Determine which variable is categorical and which is continuous
+                        x_var = [var for var in variable if var in data_types['discrete']][0]  # Categorical variable for x-axis
+                        y_var = [var for var in variable if var in data_types['continuous']][0]  # Continuous variable for y-axis
+
+                        # Create a box plot using Plotly
+                        fig = px.box(df, x=x_var, y=y_var, 
+                                    title=f"Box Plot of {y_var} by {x_var}",
+                                    labels={x_var: x_var, y_var: y_var},  # Axis labels
+                                    color=x_var,  # Color by the categorical variable
+                                    color_discrete_sequence=px.colors.qualitative.Plotly)  # Color scheme
+                        
+                        # Update layout for better visual appeal
+                        fig.update_layout(title_text=f"Histogram of {y_var} by {x_var}",
+                            title=dict(font=dict(size=20), x=0.40),
+                            xaxis_title=x_var,
+                            yaxis_title=y_var,
+                            paper_bgcolor="White",  # Background color to improve visual appeal
+                            plot_bgcolor="white",  # Background for the plot itself
+                            margin=dict(t=50, b=50),  # Adjust margins for better spacing
+                        )
+                        
+                        # Display the Plotly box plot in Streamlit
+                        st.plotly_chart(fig)
+
+                    else:
+                        st.write("Please select one continuous and one categorical variable for visualization.")
+
+                elif chart == "Scatter plot":
+
+                    # Ensure exactly two variables are selected
+                    if len(variable) == 2:
+                        st.write("Proceed with scatter plot visualization.")
+
+                        # Determine the x and y variables (selected by the user)
+                        x_var = variable[0]  # First variable for the x-axis
+                        y_var = variable[1]  # Second variable for the y-axis
+
+                        # Create a scatter plot using Plotly
+                        fig = px.scatter(df, x=x_var, y=y_var,
+                                        title=f"Scatter Plot of {y_var} vs {x_var}",
+                                        labels={x_var: x_var, y_var: y_var},  # Axis labels
+                                        color_discrete_sequence=px.colors.qualitative.Plotly)  # Color scheme
+
+                        # Update layout for better visual appeal
+                        fig.update_layout(title_text=f"Histogram of {y_var} by {x_var}",
+                            title=dict(font=dict(size=20), x=0.40),
+                            xaxis_title=x_var,
+                            yaxis_title=y_var,
+                            paper_bgcolor="White",  # Background color to improve visual appeal
+                            plot_bgcolor="white",  # Background for the plot itself
+                            margin=dict(t=50, b=50),  # Adjust margins for better spacing
+                        )
+                        
+                        # Display the Plotly scatter plot in Streamlit
+                        st.plotly_chart(fig)
+
+                    else:
+                        st.write("Please select exactly two variables for visualization.")
 
         with tab3:
             st.subheader("Advanced Vizualisation")
             st.write("The Advanced Vizualisation analysis mode has not bee released yet. Stay Tuned!")
+
+
+            # 3D Plot   
+            
 
 
     elif analysis_mode == "Text Analysis":
@@ -1428,6 +1638,9 @@ if uploaded_file is not None or selected_dataset != "No Selection":
     elif analysis_mode == "Dimensionality Reduction":
         st.subheader("Dimensionality Reduction")
         st.write(f"The {analysis_mode} analysis mode has not been released yet. Stay Tuned!")
+
+
+        #PCA
 
     elif analysis_mode == "Hypothesis Testing":
         st.subheader("Hypothesis Testing")
