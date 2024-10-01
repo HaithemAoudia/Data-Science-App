@@ -27,7 +27,7 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv()
-api_key = os.getenv('groq_api')
+api_key = st.secrets["GROQ_API_KEY"]
 client = Groq(api_key= api_key)
 
 
