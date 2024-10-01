@@ -24,7 +24,11 @@ import plotly.graph_objects as go
 import time
 import xgboost
 import requests
-client = Groq(api_key= "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")
+from dotenv import load_dotenv
+
+load_dotenv()
+api_key = os.getenv('groq_api')
+client = Groq(api_key= api_key)
 
 
 def get_video_as_base64(file_path):
